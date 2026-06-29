@@ -1,0 +1,123 @@
+name: Release
+
+# Releases are driven by the version field in Cargo.toml.
+#
+# On every push to main we read the current Cargo.toml version and check
+# whether a matching git tag already exists:
+#   * no tag yet         -> this is the first / a new version -> release
+#   * tag already exists  -> nothing to do
+#
+# A "release" performs three steps together:
+#   1. cargo publish to crates.io
+#   2. create the git tag vX.Y.Z
+#   3. create a matching GitHub Release
+#
+# The tag doubles as the durable record of "already released", which makes the
+# whole pipeline idempotent: re-running it for an already-tagged version is a
+# no-op, and a partially-failed run (published but not tagged) recovers on the
+# next run instead of trying to publish twice.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Required so the release job can create the tag and the GitHub Release.
+permissions:
+  contents: write
+
+# Never run two releases at the same time; don't cancel a publish midway.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      should_release: ${{ steps.guard.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history incl. all tags, needed by the guard
+
+      - name: Read package version from Cargo.toml
+        id: meta
+        run: |
+          version="$(awk -F'"' '/^\[package\]/{p=1} p && /^version[[:space:]]*=/{print $2; exit}' Cargo.toml)"
+          if [ -z "$version" ]; then
+            echo "::error::Could not read version from Cargo.toml"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Cargo.toml version: $version"
+
+      - name: Decide whether a release is needed
+        id: guard
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          if [ -n "$(git tag -l "v${VERSION}")" ]; then
+            echo "Tag v${VERSION} already exists -> nothing to release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No tag v${VERSION} yet -> a release will be created."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    name: Publish & release
+    needs: check
+    if: needs.check.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build & test
+        run: cargo test --locked
+
+      - name: Check if this version is already on crates.io
+        id: published
+        run: |
+          name="$(awk -F'"' '/^\[package\]/{p=1} p && /^name[[:space:]]*=/{print $2; exit}' Cargo.toml)"
+          # Derive the sparse-index path crates.io uses for this crate name.
+          case ${#name} in
+            1) path="1/$name" ;;
+            2) path="2/$name" ;;
+            3) path="3/${name:0:1}/$name" ;;
+            *) path="${name:0:2}/${name:2:2}/$name" ;;
+          esac
+          if curl -sf "https://index.crates.io/$path" | grep -qF "\"vers\":\"${VERSION}\""; then
+            echo "v${VERSION} is already on crates.io -> skipping cargo publish."
+            echo "already=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "v${VERSION} not on crates.io yet -> will publish."
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to crates.io
+        if: steps.published.outputs.already == 'false'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
+        run: cargo publish --locked
+
+      - name: Create git tag & GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${VERSION}" \
+            --target "$GITHUB_SHA" \
+            --title "v${VERSION}" \
+            --generate-notes
