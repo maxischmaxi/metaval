@@ -7,22 +7,28 @@ name: Release
 #   * no tag yet         -> this is the first / a new version -> release
 #   * tag already exists  -> nothing to do
 #
-# A "release" performs three steps together:
-#   1. cargo publish to crates.io
-#   2. create the git tag vX.Y.Z
-#   3. create a matching GitHub Release
+# A release runs as a pipeline:
+#   check  -> test -> publish -> binaries
+#
+#   1. check     read the version, decide whether a release is due
+#   2. test      run the shared CI (build & test on Linux + macOS) — a
+#                publish never happens unless these pass
+#   3. publish   cargo publish to crates.io, create the git tag vX.Y.Z and the
+#                matching GitHub Release
+#   4. binaries  build prebuilt binaries for Linux + macOS and attach them
 #
 # The tag doubles as the durable record of "already released", which makes the
 # whole pipeline idempotent: re-running it for an already-tagged version is a
-# no-op, and a partially-failed run (published but not tagged) recovers on the
-# next run instead of trying to publish twice.
+# no-op, and a partially-failed run recovers on the next run instead of trying
+# to publish the same version twice.
 
 on:
   push:
     branches: [main]
   workflow_dispatch: {}
 
-# Required so the release job can create the tag and the GitHub Release.
+# Required so the publish/binaries jobs can create the tag, the GitHub Release
+# and upload assets.
 permissions:
   contents: write
 
@@ -67,9 +73,17 @@ jobs:
             echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
 
-  release:
-    name: Publish & release
+  # Tests must pass before anything is published. Reuses the exact same
+  # definition as the PR CI (.github/workflows/ci.yml).
+  test:
+    name: Test
     needs: check
+    if: needs.check.outputs.should_release == 'true'
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish to crates.io
+    needs: [check, test]
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     env:
@@ -84,9 +98,6 @@ jobs:
 
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
-
-      - name: Build & test
-        run: cargo test --locked
 
       - name: Check if this version is already on crates.io
         id: published
@@ -121,3 +132,58 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "v${VERSION}" \
             --generate-notes
+
+  binaries:
+    name: Binary (${{ matrix.target }})
+    needs: [check, publish]
+    if: needs.check.outputs.should_release == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --locked --target "$TARGET"
+
+      - name: Package tarball + checksum
+        run: |
+          bin=metaval
+          asset="${bin}-${TARGET}"
+          mkdir -p dist
+          # Stage the binary at the tarball root so it extracts as ./metaval.
+          cp "target/${TARGET}/release/${bin}" "${bin}"
+          tar -czf "dist/${asset}.tar.gz" "${bin}"
+          cd dist
+          # Checksum: sha256sum on Linux, shasum on macOS.
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${asset}.tar.gz" > "${asset}.tar.gz.sha256"
+          else
+            shasum -a 256 "${asset}.tar.gz" > "${asset}.tar.gz.sha256"
+          fi
+
+      - name: Upload binaries to the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "v${VERSION}" dist/* --clobber

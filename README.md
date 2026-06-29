@@ -85,29 +85,69 @@ cost you **search rankings** and **broken social previews**.
 
 ## Installation
 
-`metaval` is written in **Rust** (edition 2024). You need a recent
-[Rust toolchain](https://rustup.rs/).
+### Quick install — Linux & macOS (recommended)
+
+The install script detects your platform, downloads the latest prebuilt binary
+and puts it on your `PATH`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/maxischmaxi/metaval/main/scripts/install.sh | sh
+```
+
+What it does: detects your OS/architecture (Linux x86_64, macOS Apple Silicon or
+Intel), downloads the matching release tarball from GitHub, **verifies its
+SHA-256 checksum**, and installs the `metaval` binary to `/usr/local/bin` — or to
+`~/.local/bin` if that isn't writable. Override the location with
+`METAVAL_INSTALL_DIR`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/maxischmaxi/metaval/main/scripts/install.sh \
+  | METAVAL_INSTALL_DIR="$HOME/bin" sh
+```
+
+Prefer to read before piping into a shell? The script lives at
+[`scripts/install.sh`](scripts/install.sh) — download and run it yourself, or use
+one of the methods below.
+
+### Prebuilt binaries (manual download)
+
+Grab a tarball from the latest
+[GitHub Release](https://github.com/maxischmaxi/metaval/releases/latest):
+
+| Platform | Asset |
+| --- | --- |
+| Linux x86_64 | `metaval-x86_64-unknown-linux-gnu.tar.gz` |
+| macOS (Apple Silicon) | `metaval-aarch64-apple-darwin.tar.gz` |
+| macOS (Intel) | `metaval-x86_64-apple-darwin.tar.gz` |
+
+```sh
+tar -xzf metaval-<target>.tar.gz
+sudo mv metaval /usr/local/bin/
+metaval --version
+```
+
+Each tarball ships with a matching `.sha256` file — verify it with
+`sha256sum -c metaval-<target>.tar.gz.sha256` (Linux) or
+`shasum -a 256 -c metaval-<target>.tar.gz.sha256` (macOS).
+
+### With cargo (from crates.io)
+
+If you have a [Rust toolchain](https://rustup.rs/), install straight from
+crates.io into `~/.cargo/bin`:
+
+```sh
+cargo install metaval
+```
 
 ### Build from source
 
 ```sh
 git clone https://github.com/maxischmaxi/metaval
 cd metaval
-cargo build --release
-# binary at ./target/release/metaval
-```
-
-### Install with cargo
-
-```sh
-# from a local checkout
+cargo build --release        # binary at ./target/release/metaval
+# or install it directly:
 cargo install --path .
-
-# or straight from git
-cargo install --git https://github.com/maxischmaxi/metaval
 ```
-
-This drops the `metaval` binary into `~/.cargo/bin` (make sure it's on your `PATH`).
 
 > Rendering JavaScript pages with `--render` additionally requires a Chrome/Chromium
 > installation (autodetected, or point at it with `--chrome-path`).

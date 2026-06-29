@@ -1,0 +1,32 @@
+name: CI
+
+# Build & test on Linux and macOS.
+#
+# Runs on every pull request, and is also exposed as a reusable workflow
+# (workflow_call) so the release pipeline can require the *exact same* checks
+# before publishing — "green" then means the same thing on a PR and on main.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_call: {}
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build & test
+        run: cargo test --locked
