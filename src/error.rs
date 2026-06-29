@@ -6,25 +6,25 @@ use thiserror::Error;
 /// Fehler beim Abruf der Seite (Netzwerk/Chrome). Stets Exit-Code 2.
 #[derive(Debug, Error)]
 pub enum FetchError {
-    #[error("ungültige URL: {0}")]
+    #[error("invalid URL: {0}")]
     InvalidUrl(String),
 
-    #[error("Host nicht erreichbar: {0}")]
+    #[error("host unreachable: {0}")]
     Connect(String),
 
-    #[error("Request-Timeout nach {0}s überschritten")]
+    #[error("request timed out after {0}s")]
     Timeout(u64),
 
-    #[error("TLS-Fehler (ggf. mit --insecure erneut versuchen): {0}")]
+    #[error("TLS error (retry with --insecure if appropriate): {0}")]
     Tls(String),
 
-    #[error("HTTP-Transportfehler: {0}")]
+    #[error("HTTP transport error: {0}")]
     Transport(#[source] reqwest::Error),
 
-    #[error("Chrome konnte nicht gestartet werden (--chrome-path setzen oder Chrome installieren): {0}")]
+    #[error("failed to launch Chrome (set --chrome-path or install Chrome): {0}")]
     ChromeLaunch(String),
 
-    #[error("Chrome-Navigationsfehler: {0}")]
+    #[error("Chrome navigation error: {0}")]
     Chrome(String),
 }
 

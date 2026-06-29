@@ -74,18 +74,18 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     for err in &meta.json_ld_errors {
         let snippet: String = err.chars().take(80).collect();
         f.push(
-            Finding::new(ld, Severity::Error, "ld.json.valid", "Ungültiges JSON-LD")
+            Finding::new(ld, Severity::Error, "ld.json.valid", "Invalid JSON-LD")
                 .with_detail(snippet),
         );
     }
 
     if meta.json_ld.is_empty() {
         if meta.json_ld_errors.is_empty() {
-            f.push(Finding::new(ld, Severity::Info, "ld.present", "Kein JSON-LD vorhanden"));
+            f.push(Finding::new(ld, Severity::Info, "ld.present", "No JSON-LD present"));
         }
         return f;
     }
-    f.push(Finding::new(ld, Severity::Pass, "ld.json.valid", "JSON-LD-Blöcke sind gültiges JSON"));
+    f.push(Finding::new(ld, Severity::Pass, "ld.json.valid", "JSON-LD blocks are valid JSON"));
 
     // Knoten flach ziehen (Top-Level-Arrays + @graph auflösen).
     let mut nodes: Vec<&Map<String, Value>> = Vec::new();
@@ -96,17 +96,17 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
 
     // @context
     if ctx_seen {
-        f.push(Finding::new(ld, Severity::Pass, "ld.context.present", "@context referenziert schema.org"));
+        f.push(Finding::new(ld, Severity::Pass, "ld.context.present", "@context references schema.org"));
     } else {
-        f.push(Finding::new(ld, Severity::Warning, "ld.context.present", "@context referenziert nicht schema.org"));
+        f.push(Finding::new(ld, Severity::Warning, "ld.context.present", "@context does not reference schema.org"));
     }
 
     // @type vorhanden?
     let any_type = nodes.iter().any(|n| !types_of(n).is_empty());
     if any_type {
-        f.push(Finding::new(ld, Severity::Pass, "ld.type.present", "@type vorhanden"));
+        f.push(Finding::new(ld, Severity::Pass, "ld.type.present", "@type present"));
     } else {
-        f.push(Finding::new(ld, Severity::Warning, "ld.type.present", "Kein @type in den JSON-LD-Knoten"));
+        f.push(Finding::new(ld, Severity::Warning, "ld.type.present", "No @type in the JSON-LD nodes"));
     }
 
     // Pflicht-/Empfehlungs-Props je bekanntem Typ.
@@ -122,7 +122,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                             ld,
                             Severity::Error,
                             "ld.required_props",
-                            format!("{}: Pflicht-Property '{prop}' fehlt", spec.name),
+                            format!("{}: required property '{prop}' missing", spec.name),
                         )
                         .with_detail(ty.clone()),
                     );
@@ -134,13 +134,13 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                         ld,
                         Severity::Warning,
                         "ld.required_props",
-                        format!("{}: empfohlene Property '{prop}' fehlt", spec.name),
+                        format!("{}: recommended property '{prop}' missing", spec.name),
                     ));
                 }
             }
             if all_required {
                 f.push(
-                    Finding::new(ld, Severity::Pass, "ld.required_props", format!("{}: Pflicht-Properties vollständig", spec.name))
+                    Finding::new(ld, Severity::Pass, "ld.required_props", format!("{}: required properties complete", spec.name))
                         .with_detail(ty.clone()),
                 );
             }

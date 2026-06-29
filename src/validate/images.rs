@@ -152,24 +152,24 @@ fn finding_for(c: &ImageCandidate, reach: &Reachability) -> Finding {
     let url = c.url.as_str().to_string();
     match reach {
         Reachability::Ok => {
-            Finding::new(c.category, Severity::Pass, c.rule, "Bild erreichbar").with_detail(url)
+            Finding::new(c.category, Severity::Pass, c.rule, "Image reachable").with_detail(url)
         }
         Reachability::WrongType(ct) => Finding::new(
             c.category,
             Severity::Warning,
             c.rule,
-            "Bild erreichbar, aber Content-Type ist kein image/*",
+            "Image reachable, but Content-Type is not image/*",
         )
         .with_detail(format!("{ct} — {url}")),
         Reachability::BadStatus(s) => Finding::new(
             c.category,
             Severity::Error,
             c.rule,
-            format!("Bild nicht erreichbar (Status {s})"),
+            format!("Image not reachable (status {s})"),
         )
         .with_detail(url),
         Reachability::NetworkError(e) => {
-            Finding::new(c.category, Severity::Error, c.rule, "Bild nicht erreichbar")
+            Finding::new(c.category, Severity::Error, c.rule, "Image not reachable")
                 .with_detail(format!("{e} — {url}"))
         }
     }

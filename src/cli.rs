@@ -3,57 +3,57 @@
 use clap::{ArgAction, Parser, ValueEnum};
 
 #[derive(Parser, Debug)]
-#[command(name = "metaval", version, about = "Metadaten einer Webseite abrufen und validieren")]
+#[command(name = "metaval", version, about = "Fetch and validate the metadata of a web page")]
 pub struct Args {
-    /// Zu prüfende URL.
+    /// URL to check.
     #[arg(short, long)]
     pub url: String,
 
-    /// Seite via Headless Chrome rendern (JS ausführen) statt reinem HTTP-GET.
+    /// Render the page via headless Chrome (execute JS) instead of a plain HTTP GET.
     #[arg(long, default_value_t = false)]
     pub render: bool,
 
-    /// Pfad zur Chrome-Binary (sonst Autodetect).
+    /// Path to the Chrome binary (autodetected otherwise).
     #[arg(long)]
     pub chrome_path: Option<String>,
 
-    /// Timeout pro Request in Sekunden.
+    /// Timeout per request in seconds.
     #[arg(long, default_value_t = 20)]
     pub timeout: u64,
 
-    /// User-Agent für HTTP-Requests (Default: `metaval/<version>`).
+    /// User agent for HTTP requests (default: `metaval/<version>`).
     #[arg(long)]
     pub user_agent: Option<String>,
 
-    /// Erreichbarkeit verlinkter Bilder prüfen (Default: an).
+    /// Check reachability of linked images (default: on).
     #[arg(long = "check-images", action = ArgAction::SetTrue, overrides_with = "no_check_images")]
     check_images: bool,
 
-    /// Bild-Erreichbarkeitsprüfung deaktivieren.
+    /// Disable the image reachability check.
     #[arg(long = "no-check-images", action = ArgAction::SetTrue, overrides_with = "check_images")]
     no_check_images: bool,
 
-    /// Ausgabeformat.
+    /// Output format.
     #[arg(long, value_enum, default_value_t = Format::Pretty)]
     pub format: Format,
 
-    /// Ab welchem Level der Exit-Code ≠ 0 wird.
+    /// Severity level at which the exit code becomes non-zero.
     #[arg(long, value_enum, default_value_t = FailOn::Error)]
     pub fail_on: FailOn,
 
-    /// Nur Basis-/Minimum-Set prüfen (OG/Twitter/schema.org überspringen).
+    /// Check only the base/minimum set (skip OG/Twitter/schema.org).
     #[arg(long, default_value_t = false)]
     pub min_only: bool,
 
-    /// TLS-Zertifikatsfehler ignorieren.
+    /// Ignore TLS certificate errors.
     #[arg(long, default_value_t = false)]
     pub insecure: bool,
 
-    /// Farbausgabe deaktivieren (auch via NO_COLOR).
+    /// Disable colored output (also via NO_COLOR).
     #[arg(long, default_value_t = false)]
     pub no_color: bool,
 
-    /// Logging-Level erhöhen (mehrfach: -vv).
+    /// Increase logging verbosity (repeatable: -vv).
     #[arg(short, long, action = ArgAction::Count)]
     pub verbose: u8,
 }

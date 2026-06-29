@@ -32,7 +32,7 @@ async fn main() -> ExitCode {
     match run(&args).await {
         Ok(code) => code,
         Err(e) => {
-            eprintln!("Fehler: {e}");
+            eprintln!("Error: {e}");
             ExitCode::from(2)
         }
     }
@@ -44,12 +44,12 @@ async fn run(args: &Args) -> Result<ExitCode, AppError> {
     let url = Url::parse(&args.url)
         .map_err(|e| FetchError::InvalidUrl(format!("{}: {e}", args.url)))?;
     if !matches!(url.scheme(), "http" | "https") {
-        return Err(FetchError::InvalidUrl(format!("nicht unterstütztes Schema: {}", url.scheme())).into());
+        return Err(FetchError::InvalidUrl(format!("unsupported scheme: {}", url.scheme())).into());
     }
 
     // Seite abrufen (HTTP oder Chrome). FetchError ⇒ Exit 2.
     let fetcher = Fetcher::from_args(args)?;
-    let spinner = Spinner::start(format!("Lade {url} …"), args.progress_enabled());
+    let spinner = Spinner::start(format!("Loading {url} …"), args.progress_enabled());
     let fetched = fetcher.fetch(&url).await;
     spinner.finish().await;
     let page = fetched?;
@@ -64,10 +64,10 @@ async fn run(args: &Args) -> Result<ExitCode, AppError> {
         .redirect(redirect::Policy::limited(10))
         .danger_accept_invalid_certs(args.insecure)
         .build()
-        .map_err(|e| AppError::Other(format!("HTTP-Client konnte nicht gebaut werden: {e}")))?;
+        .map_err(|e| AppError::Other(format!("failed to build HTTP client: {e}")))?;
 
     let spinner = Spinner::start(
-        "Prüfe Metadaten & verlinkte Bilder …",
+        "Checking metadata & linked images …",
         args.progress_enabled() && args.images_enabled(),
     );
     let mut findings = validate::run_all(&meta, args, &image_client).await;
@@ -90,7 +90,7 @@ fn fetch_level_findings(meta: &PageMetadata, rendered: bool) -> Vec<Finding> {
 
     if meta.status >= 400 {
         f.push(
-            Finding::new(cat, Severity::Error, "fetch.status", "HTTP-Fehlerstatus")
+            Finding::new(cat, Severity::Error, "fetch.status", "HTTP error status")
                 .with_detail(meta.status.to_string()),
         );
         // Typische Bot-Schutz-/Rate-Limit-Antworten → konkreter Lösungshinweis.
@@ -99,19 +99,19 @@ fn fetch_level_findings(meta: &PageMetadata, rendered: bool) -> Vec<Finding> {
                 cat,
                 Severity::Info,
                 "fetch.bot_block",
-                "Status deutet auf Bot-Schutz/Rate-Limit hin — mit --user-agent oder --render erneut versuchen",
+                "Status suggests bot protection / rate limiting — retry with --user-agent or --render",
             ));
         }
     } else {
         f.push(
-            Finding::new(cat, Severity::Pass, "fetch.status", "HTTP-Status OK")
+            Finding::new(cat, Severity::Pass, "fetch.status", "HTTP status OK")
                 .with_detail(meta.status.to_string()),
         );
     }
 
     if !meta.is_html() {
         f.push(
-            Finding::new(cat, Severity::Error, "fetch.content_type", "Kein HTML-Dokument")
+            Finding::new(cat, Severity::Error, "fetch.content_type", "Not an HTML document")
                 .with_detail(meta.content_type.clone().unwrap_or_default()),
         );
     }
@@ -123,7 +123,7 @@ fn fetch_level_findings(meta: &PageMetadata, rendered: bool) -> Vec<Finding> {
             cat,
             Severity::Warning,
             "fetch.spa_hint",
-            "Seite wirkt wie eine SPA ohne serverseitige Metadaten — ggf. --render nutzen",
+            "Page looks like an SPA without server-side metadata — consider using --render",
         ));
     }
 

@@ -12,7 +12,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     let mut f = Vec::new();
 
     if !meta.has_twitter() {
-        f.push(Finding::new(tw, Severity::Info, "tw.present", "Keine Twitter-Card-Metadaten vorhanden"));
+        f.push(Finding::new(tw, Severity::Info, "tw.present", "No Twitter Card metadata present"));
         return f;
     }
 
@@ -20,33 +20,33 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     let card = meta.named("twitter:card");
     match card {
         Some(c) => {
-            f.push(Finding::new(tw, Severity::Pass, "tw.card.present", "twitter:card vorhanden").with_detail(c.to_string()));
+            f.push(Finding::new(tw, Severity::Pass, "tw.card.present", "twitter:card present").with_detail(c.to_string()));
             if VALID_CARDS.contains(&c.to_ascii_lowercase().as_str()) {
-                f.push(Finding::new(tw, Severity::Pass, "tw.card.valid", "twitter:card-Wert gültig"));
+                f.push(Finding::new(tw, Severity::Pass, "tw.card.valid", "twitter:card value valid"));
             } else {
                 f.push(
-                    Finding::new(tw, Severity::Error, "tw.card.valid", "twitter:card mit ungültigem Wert")
+                    Finding::new(tw, Severity::Error, "tw.card.valid", "twitter:card with invalid value")
                         .with_detail(c.to_string()),
                 );
             }
         }
-        None => f.push(Finding::new(tw, Severity::Warning, "tw.card.present", "twitter:card fehlt")),
+        None => f.push(Finding::new(tw, Severity::Warning, "tw.card.present", "twitter:card missing")),
     }
 
     // twitter:title (Fallback og:title zulässig)
     if meta.named("twitter:title").is_some() {
-        f.push(Finding::new(tw, Severity::Pass, "tw.title.present", "twitter:title vorhanden"));
+        f.push(Finding::new(tw, Severity::Pass, "tw.title.present", "twitter:title present"));
     } else if meta.og("og:title").is_some() {
-        f.push(Finding::new(tw, Severity::Info, "tw.title.present", "twitter:title fehlt (Fallback og:title vorhanden)"));
+        f.push(Finding::new(tw, Severity::Info, "tw.title.present", "twitter:title missing (og:title fallback present)"));
     } else {
-        f.push(Finding::new(tw, Severity::Info, "tw.title.present", "twitter:title fehlt"));
+        f.push(Finding::new(tw, Severity::Info, "tw.title.present", "twitter:title missing"));
     }
 
     // twitter:description
     if meta.named("twitter:description").is_some() {
-        f.push(Finding::new(tw, Severity::Pass, "tw.description.present", "twitter:description vorhanden"));
+        f.push(Finding::new(tw, Severity::Pass, "tw.description.present", "twitter:description present"));
     } else {
-        f.push(Finding::new(tw, Severity::Info, "tw.description.present", "twitter:description fehlt"));
+        f.push(Finding::new(tw, Severity::Info, "tw.description.present", "twitter:description missing"));
     }
 
     // twitter:image (nur relevant, wenn Card-Typ ein Bild verlangt)
@@ -56,13 +56,13 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     let has_image = meta.named("twitter:image").is_some() || meta.og("og:image").is_some();
     if needs_image {
         if has_image {
-            f.push(Finding::new(tw, Severity::Pass, "tw.image.present", "twitter:image (oder og:image-Fallback) vorhanden"));
+            f.push(Finding::new(tw, Severity::Pass, "tw.image.present", "twitter:image (or og:image fallback) present"));
         } else {
             f.push(Finding::new(
                 tw,
                 Severity::Warning,
                 "tw.image.present",
-                "twitter:image fehlt, obwohl Card-Typ ein Bild verlangt",
+                "twitter:image missing although the card type requires an image",
             ));
         }
     }

@@ -98,10 +98,10 @@ fn render_pretty(
     writeln!(out)?;
     writeln!(
         out,
-        "Zusammenfassung: {} Fehler, {} Warnungen, {} Infos, {} OK",
+        "Summary: {} errors, {} warnings, {} info, {} OK",
         s.errors, s.warnings, s.info, s.pass
     )?;
-    writeln!(out, "Finale URL: {} (Status {})", page.final_url, page.status)?;
+    writeln!(out, "Final URL: {} (status {})", page.final_url, page.status)?;
     Ok(())
 }
 

@@ -73,11 +73,11 @@ impl Category {
     pub fn title(self) -> &'static str {
         match self {
             Self::Baseline => "Baseline",
-            Self::Hreflang => "Internationalisierung (hreflang)",
+            Self::Hreflang => "Internationalization (hreflang)",
             Self::OpenGraph => "Open Graph",
             Self::Twitter => "Twitter Cards",
             Self::SchemaOrg => "schema.org / JSON-LD",
-            Self::Images => "Bilder",
+            Self::Images => "Images",
             Self::Fetch => "Fetch",
         }
     }

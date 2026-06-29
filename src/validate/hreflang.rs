@@ -28,13 +28,13 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
             h,
             Severity::Info,
             "hreflang.present",
-            "Keine hreflang-Alternates vorhanden (nur für mehrsprachige Seiten nötig)",
+            "No hreflang alternates present (only needed for multilingual pages)",
         ));
         return f;
     }
     f.push(
-        Finding::new(h, Severity::Pass, "hreflang.present", "hreflang-Alternates vorhanden")
-            .with_detail(format!("{} Eintrag/Einträge", alts.len())),
+        Finding::new(h, Severity::Pass, "hreflang.present", "hreflang alternates present")
+            .with_detail(format!("{} entry/entries", alts.len())),
     );
 
     // 1) Werte + Absolutheit prüfen.
@@ -52,7 +52,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                         h,
                         Severity::Warning,
                         "hreflang.value.valid",
-                        format!("ungültiger hreflang-Wert '{val}': {reason}"),
+                        format!("invalid hreflang value '{val}': {reason}"),
                     )
                     .with_detail(href.to_string()),
                 );
@@ -65,28 +65,28 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                     h,
                     Severity::Warning,
                     "hreflang.absolute",
-                    "hreflang-URL ist nicht absolut (Google verlangt vollständige URLs)",
+                    "hreflang URL is not absolute (Google requires full URLs)",
                 )
                 .with_detail(format!("{val} → {href}")),
             );
         }
     }
     if !any_invalid {
-        f.push(Finding::new(h, Severity::Pass, "hreflang.value.valid", "alle hreflang-Werte plausibel"));
+        f.push(Finding::new(h, Severity::Pass, "hreflang.value.valid", "all hreflang values plausible"));
     }
     if !any_relative {
-        f.push(Finding::new(h, Severity::Pass, "hreflang.absolute", "alle hreflang-URLs sind absolut"));
+        f.push(Finding::new(h, Severity::Pass, "hreflang.absolute", "all hreflang URLs are absolute"));
     }
 
     // 2) x-default (für Standard-/Sprachauswahlseite empfohlen).
     if has_x_default {
-        f.push(Finding::new(h, Severity::Pass, "hreflang.x_default", "x-default vorhanden"));
+        f.push(Finding::new(h, Severity::Pass, "hreflang.x_default", "x-default present"));
     } else {
         f.push(Finding::new(
             h,
             Severity::Info,
             "hreflang.x_default",
-            "kein x-default — für Sprachauswahl-/Standardseite empfohlen",
+            "no x-default — recommended for a language-selection/default page",
         ));
     }
 
@@ -108,27 +108,27 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                     h,
                     Severity::Warning,
                     "hreflang.conflict",
-                    format!("widersprüchliche hreflang-Einträge für '{val}'"),
+                    format!("conflicting hreflang entries for '{val}'"),
                 )
                 .with_detail(detail),
             );
         }
     }
     if !any_conflict {
-        f.push(Finding::new(h, Severity::Pass, "hreflang.conflict", "keine widersprüchlichen hreflang-Einträge"));
+        f.push(Finding::new(h, Severity::Pass, "hreflang.conflict", "no conflicting hreflang entries"));
     }
 
     // 4) Selbstverweis: jede Sprachvariante soll sich selbst listen.
     let self_norm = normalize_url(&meta.final_url);
     let self_ref = alts.iter().any(|&(_, href)| resolve(meta, href) == self_norm);
     if self_ref {
-        f.push(Finding::new(h, Severity::Pass, "hreflang.self_reference", "Seite verweist per hreflang auf sich selbst"));
+        f.push(Finding::new(h, Severity::Pass, "hreflang.self_reference", "Page references itself via hreflang"));
     } else {
         f.push(Finding::new(
             h,
             Severity::Info,
             "hreflang.self_reference",
-            "kein hreflang-Selbstverweis gefunden (jede Sprachvariante sollte sich selbst listen)",
+            "no hreflang self-reference found (each language variant should list itself)",
         ));
     }
 
@@ -146,7 +146,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                         h,
                         Severity::Warning,
                         "hreflang.canonical_consistency",
-                        "Canonical zeigt auf eine andere Sprachvariante — bricht hreflang (jede Variante sollte sich selbst kanonisieren)",
+                        "Canonical points to a different language variant — breaks hreflang (each variant should canonicalize to itself)",
                     )
                     .with_detail(canon_norm),
                 );
@@ -174,24 +174,24 @@ fn classify_hreflang(value: &str) -> HreflangKind {
         return HreflangKind::XDefault;
     }
     if v.is_empty() {
-        return HreflangKind::Invalid("leer".to_string());
+        return HreflangKind::Invalid("empty".to_string());
     }
     // Häufiger Fehler: Unterstrich statt Bindestrich (z. B. en_US).
     if v.contains('_') {
-        return HreflangKind::Invalid("'_' statt '-' verwendet (richtig z. B. en-US)".to_string());
+        return HreflangKind::Invalid("'_' used instead of '-' (correct e.g. en-US)".to_string());
     }
 
     let mut parts = v.split('-');
     let lang = parts.next().unwrap_or("");
     if !(2..=3).contains(&lang.len()) || !lang.chars().all(|c| c.is_ascii_alphabetic()) {
-        return HreflangKind::Invalid(format!("'{lang}' ist kein gültiger Sprachcode"));
+        return HreflangKind::Invalid(format!("'{lang}' is not a valid language code"));
     }
     for sub in parts {
         let is_region_alpha = sub.len() == 2 && sub.chars().all(|c| c.is_ascii_alphabetic());
         let is_region_num = sub.len() == 3 && sub.chars().all(|c| c.is_ascii_digit());
         let is_script = sub.len() == 4 && sub.chars().all(|c| c.is_ascii_alphabetic());
         if !(is_region_alpha || is_region_num || is_script) {
-            return HreflangKind::Invalid(format!("Subtag '{sub}' unbekannt"));
+            return HreflangKind::Invalid(format!("subtag '{sub}' unknown"));
         }
     }
     HreflangKind::Valid

@@ -35,7 +35,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     // title
     match meta.title.as_deref().filter(|t| !t.trim().is_empty()) {
         Some(title) => {
-            f.push(Finding::new(b, Severity::Pass, "base.title.present", "Titel vorhanden"));
+            f.push(Finding::new(b, Severity::Pass, "base.title.present", "Title present"));
             let len = title.chars().count();
             if !(TITLE_MIN..=TITLE_MAX).contains(&len) {
                 f.push(
@@ -43,26 +43,26 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                         b,
                         Severity::Warning,
                         "base.title.length",
-                        format!("Titel-Länge {len} außerhalb empfohlener {TITLE_MIN}–{TITLE_MAX} Zeichen"),
+                        format!("Title length {len} outside the recommended {TITLE_MIN}–{TITLE_MAX} characters"),
                     )
                     .with_detail(title.to_string()),
                 );
             } else {
-                f.push(Finding::new(b, Severity::Pass, "base.title.length", "Titel-Länge im empfohlenen Bereich"));
+                f.push(Finding::new(b, Severity::Pass, "base.title.length", "Title length within the recommended range"));
             }
         }
         None => f.push(Finding::new(
             b,
             Severity::Error,
             "base.title.present",
-            "<title> fehlt oder ist leer",
+            "<title> missing or empty",
         )),
     }
 
     // description
     match meta.named("description") {
         Some(desc) => {
-            f.push(Finding::new(b, Severity::Pass, "base.description.present", "Meta-Description vorhanden"));
+            f.push(Finding::new(b, Severity::Pass, "base.description.present", "Meta description present"));
             let len = desc.chars().count();
             if !(DESC_MIN..=DESC_MAX).contains(&len) {
                 f.push(
@@ -70,59 +70,59 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                         b,
                         Severity::Warning,
                         "base.description.length",
-                        format!("Description-Länge {len} außerhalb empfohlener {DESC_MIN}–{DESC_MAX} Zeichen"),
+                        format!("Description length {len} outside the recommended {DESC_MIN}–{DESC_MAX} characters"),
                     )
                     .with_detail(desc.to_string()),
                 );
             } else {
-                f.push(Finding::new(b, Severity::Pass, "base.description.length", "Description-Länge im empfohlenen Bereich"));
+                f.push(Finding::new(b, Severity::Pass, "base.description.length", "Description length within the recommended range"));
             }
         }
         None => f.push(Finding::new(
             b,
             Severity::Error,
             "base.description.present",
-            "<meta name=\"description\"> fehlt oder ist leer",
+            "<meta name=\"description\"> missing or empty",
         )),
     }
 
     // charset
     match &meta.charset {
         Some(cs) => f.push(
-            Finding::new(b, Severity::Pass, "base.charset.present", "Zeichensatz deklariert")
+            Finding::new(b, Severity::Pass, "base.charset.present", "Character set declared")
                 .with_detail(cs.clone()),
         ),
         None => f.push(Finding::new(
             b,
             Severity::Error,
             "base.charset.present",
-            "Kein Zeichensatz deklariert (<meta charset>)",
+            "No character set declared (<meta charset>)",
         )),
     }
 
     // viewport
     if meta.named("viewport").is_some() {
-        f.push(Finding::new(b, Severity::Pass, "base.viewport.present", "Viewport gesetzt"));
+        f.push(Finding::new(b, Severity::Pass, "base.viewport.present", "Viewport set"));
     } else {
         f.push(Finding::new(
             b,
             Severity::Warning,
             "base.viewport.present",
-            "<meta name=\"viewport\"> fehlt",
+            "<meta name=\"viewport\"> missing",
         ));
     }
 
     // html lang
     match meta.html_lang.as_deref().filter(|l| !l.trim().is_empty()) {
         Some(lang) => f.push(
-            Finding::new(b, Severity::Pass, "base.lang.present", "html lang gesetzt")
+            Finding::new(b, Severity::Pass, "base.lang.present", "html lang set")
                 .with_detail(lang.to_string()),
         ),
         None => f.push(Finding::new(
             b,
             Severity::Warning,
             "base.lang.present",
-            "<html lang> nicht gesetzt",
+            "<html lang> not set",
         )),
     }
 
@@ -130,12 +130,12 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     match meta.canonical() {
         Some(canon) => {
             f.push(
-                Finding::new(b, Severity::Pass, "base.canonical.present", "Canonical-Link vorhanden")
+                Finding::new(b, Severity::Pass, "base.canonical.present", "Canonical link present")
                     .with_detail(canon.to_string()),
             );
             if !is_absolute_url(canon) {
                 f.push(
-                    Finding::new(b, Severity::Info, "base.canonical.absolute", "Canonical sollte eine absolute URL sein")
+                    Finding::new(b, Severity::Info, "base.canonical.absolute", "Canonical should be an absolute URL")
                         .with_detail(canon.to_string()),
                 );
             }
@@ -146,7 +146,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                         b,
                         Severity::Pass,
                         "base.canonical.matches",
-                        "Canonical entspricht der finalen URL",
+                        "Canonical matches the final URL",
                     ));
                 }
                 Some(c) => f.push(
@@ -154,7 +154,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                         b,
                         Severity::Info,
                         "base.canonical.matches",
-                        "Canonical weicht von der finalen URL ab",
+                        "Canonical differs from the final URL",
                     )
                     .with_detail(format!("canonical={c} final={}", meta.final_url)),
                 ),
@@ -163,7 +163,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                         b,
                         Severity::Warning,
                         "base.canonical.matches",
-                        "Canonical-URL nicht auflösbar",
+                        "Canonical URL not resolvable",
                     )
                     .with_detail(canon.to_string()),
                 ),
@@ -173,7 +173,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
             b,
             Severity::Warning,
             "base.canonical.present",
-            "<link rel=\"canonical\"> fehlt",
+            "<link rel=\"canonical\"> missing",
         )),
     }
 
@@ -195,7 +195,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                     b,
                     Severity::Warning,
                     "base.canonical.unique",
-                    "Mehrere widersprüchliche <link rel=\"canonical\"> gefunden",
+                    "Multiple conflicting <link rel=\"canonical\"> found",
                 )
                 .with_detail(canon_hrefs.join(" | ")),
             );
@@ -216,7 +216,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
             .collect();
         if unknown.is_empty() {
             f.push(
-                Finding::new(b, Severity::Info, "base.robots.parse", "robots-Direktiven plausibel")
+                Finding::new(b, Severity::Info, "base.robots.parse", "robots directives plausible")
                     .with_detail(robots.to_string()),
             );
         } else {
@@ -225,7 +225,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
                     b,
                     Severity::Info,
                     "base.robots.parse",
-                    "unbekannte robots-Direktive(n)",
+                    "unknown robots directive(s)",
                 )
                 .with_detail(unknown.join(", ")),
             );
@@ -263,12 +263,12 @@ fn indexability(meta: &PageMetadata, b: Category) -> Vec<Finding> {
                 b,
                 Severity::Warning,
                 "base.robots.indexable",
-                "Seite ist auf noindex gesetzt — Suchmaschinen werden sie nicht indexieren",
+                "Page is set to noindex — search engines will not index it",
             )
-            .with_detail(format!("Quelle: {}", sources.join(", "))),
+            .with_detail(format!("Source: {}", sources.join(", "))),
         );
     } else {
-        f.push(Finding::new(b, Severity::Pass, "base.robots.indexable", "Seite ist indexierbar (kein noindex)"));
+        f.push(Finding::new(b, Severity::Pass, "base.robots.indexable", "Page is indexable (no noindex)"));
     }
 
     if nofollow && !noindex {
@@ -276,7 +276,7 @@ fn indexability(meta: &PageMetadata, b: Category) -> Vec<Finding> {
             b,
             Severity::Info,
             "base.robots.follow",
-            "nofollow gesetzt — Links auf dieser Seite werden nicht verfolgt",
+            "nofollow set — links on this page will not be followed",
         ));
     }
 

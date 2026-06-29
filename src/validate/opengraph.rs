@@ -20,7 +20,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
             og,
             Severity::Info,
             "og.present",
-            "Keine Open-Graph-Metadaten vorhanden",
+            "No Open Graph metadata present",
         ));
         return f;
     }
@@ -33,75 +33,75 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
         Some(t) => {
             let base = t.split('.').next().unwrap_or(t).to_ascii_lowercase();
             if VALID_OG_TYPES.contains(&base.as_str()) {
-                f.push(Finding::new(og, Severity::Pass, "og.type.present", "og:type gültig").with_detail(t.to_string()));
+                f.push(Finding::new(og, Severity::Pass, "og.type.present", "og:type valid").with_detail(t.to_string()));
             } else {
                 f.push(
-                    Finding::new(og, Severity::Warning, "og.type.present", "og:type mit unbekanntem Wert")
+                    Finding::new(og, Severity::Warning, "og.type.present", "og:type with unknown value")
                         .with_detail(t.to_string()),
                 );
             }
         }
-        None => f.push(Finding::new(og, Severity::Error, "og.type.present", "og:type fehlt")),
+        None => f.push(Finding::new(og, Severity::Error, "og.type.present", "og:type missing")),
     }
 
     // og:url (Pflicht, absolut)
     match meta.og("og:url") {
         Some(u) if is_absolute_url(u) => {
-            f.push(Finding::new(og, Severity::Pass, "og.url.present", "og:url vorhanden (absolut)").with_detail(u.to_string()));
+            f.push(Finding::new(og, Severity::Pass, "og.url.present", "og:url present (absolute)").with_detail(u.to_string()));
         }
         Some(u) => f.push(
-            Finding::new(og, Severity::Warning, "og.url.present", "og:url ist nicht absolut")
+            Finding::new(og, Severity::Warning, "og.url.present", "og:url is not absolute")
                 .with_detail(u.to_string()),
         ),
-        None => f.push(Finding::new(og, Severity::Error, "og.url.present", "og:url fehlt")),
+        None => f.push(Finding::new(og, Severity::Error, "og.url.present", "og:url missing")),
     }
 
     // og:image (Pflicht) + absolut
     let images = PageMetadata::all(&meta.meta_property, "og:image");
     if images.is_empty() {
-        f.push(Finding::new(og, Severity::Error, "og.image.present", "og:image fehlt"));
+        f.push(Finding::new(og, Severity::Error, "og.image.present", "og:image missing"));
     } else {
         f.push(
-            Finding::new(og, Severity::Pass, "og.image.present", "og:image vorhanden")
-                .with_detail(format!("{} Bild(er)", images.len())),
+            Finding::new(og, Severity::Pass, "og.image.present", "og:image present")
+                .with_detail(format!("{} image(s)", images.len())),
         );
         for img in images {
             if !is_absolute_url(img) {
                 f.push(
-                    Finding::new(og, Severity::Warning, "og.image.absolute", "og:image ist nicht absolut")
+                    Finding::new(og, Severity::Warning, "og.image.absolute", "og:image is not absolute")
                         .with_detail(img.clone()),
                 );
             }
         }
         // Dimensions
         if meta.og("og:image:width").is_some() && meta.og("og:image:height").is_some() {
-            f.push(Finding::new(og, Severity::Pass, "og.image.dimensions", "og:image:width/height gesetzt"));
+            f.push(Finding::new(og, Severity::Pass, "og.image.dimensions", "og:image:width/height set"));
         } else {
             f.push(Finding::new(
                 og,
                 Severity::Warning,
                 "og.image.dimensions",
-                "og:image:width/height nicht (vollständig) gesetzt",
+                "og:image:width/height not (fully) set",
             ));
         }
         // Alt
         if meta.og("og:image:alt").is_some() {
-            f.push(Finding::new(og, Severity::Pass, "og.image.alt", "og:image:alt gesetzt"));
+            f.push(Finding::new(og, Severity::Pass, "og.image.alt", "og:image:alt set"));
         } else {
-            f.push(Finding::new(og, Severity::Info, "og.image.alt", "og:image:alt nicht gesetzt"));
+            f.push(Finding::new(og, Severity::Info, "og.image.alt", "og:image:alt not set"));
         }
     }
 
     // Empfehlungen
     if meta.og("og:description").is_some() {
-        f.push(Finding::new(og, Severity::Pass, "og.description.present", "og:description vorhanden"));
+        f.push(Finding::new(og, Severity::Pass, "og.description.present", "og:description present"));
     } else {
-        f.push(Finding::new(og, Severity::Warning, "og.description.present", "og:description empfohlen"));
+        f.push(Finding::new(og, Severity::Warning, "og.description.present", "og:description recommended"));
     }
     if meta.og("og:site_name").is_some() {
-        f.push(Finding::new(og, Severity::Pass, "og.site_name.present", "og:site_name vorhanden"));
+        f.push(Finding::new(og, Severity::Pass, "og.site_name.present", "og:site_name present"));
     } else {
-        f.push(Finding::new(og, Severity::Info, "og.site_name.present", "og:site_name empfohlen"));
+        f.push(Finding::new(og, Severity::Info, "og.site_name.present", "og:site_name recommended"));
     }
 
     f
@@ -110,8 +110,8 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
 /// Pflichtfeld: vorhanden ⇒ Pass, sonst Error.
 fn require(f: &mut Vec<Finding>, cat: Category, value: Option<&str>, rule: &str, label: &str) {
     match value {
-        Some(v) => f.push(Finding::new(cat, Severity::Pass, rule, format!("{label} vorhanden")).with_detail(v.to_string())),
-        None => f.push(Finding::new(cat, Severity::Error, rule, format!("{label} fehlt"))),
+        Some(v) => f.push(Finding::new(cat, Severity::Pass, rule, format!("{label} present")).with_detail(v.to_string())),
+        None => f.push(Finding::new(cat, Severity::Error, rule, format!("{label} missing"))),
     }
 }
 
