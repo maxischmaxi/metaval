@@ -2,6 +2,16 @@
 name = "metaval"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+authors = ["maxischmaxi"]
+description = "Fast CLI to validate a web page's SEO metadata: meta tags, Open Graph, Twitter Cards, schema.org/JSON-LD, hreflang, canonical and indexability — with JSON output and CI-friendly exit codes."
+documentation = "https://github.com/maxischmaxi/metaval#readme"
+homepage = "https://github.com/maxischmaxi/metaval"
+repository = "https://github.com/maxischmaxi/metaval"
+readme = "README.md"
+license = "MIT"
+keywords = ["seo", "metadata", "open-graph", "validator", "cli"]
+categories = ["command-line-utilities", "web-programming"]
 
 [dependencies]
 anyhow = "1.0.103"
