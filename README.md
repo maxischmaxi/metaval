@@ -56,15 +56,17 @@ cost you **search rankings** and **broken social previews**.
 ## Features
 
 - **Baseline SEO checks** — `<title>`, meta description (with recommended length
-  ranges), `<meta charset>`, `viewport`, `<html lang>`, canonical link
-  (presence, absoluteness, self-match, duplicate/conflict detection).
+  ranges and duplicate detection), `<meta charset>` (incl. UTF-8 recommendation),
+  `viewport`, `<html lang>`, canonical link (presence, absoluteness, self-match,
+  duplicate/conflict detection).
 - **Indexability** — detects `noindex` / `nofollow` from `<meta name="robots">`,
   `<meta name="googlebot">` **and** the `X-Robots-Tag` HTTP response header, so a
   stray `noindex` can't slip into production unnoticed.
 - **Open Graph validation** — `og:title`, `og:type`, `og:url`, `og:image`
   (+ dimensions, `og:image:alt`, absolute URLs), `og:description`, `og:site_name`.
+  Tags declared with `name=` instead of `property=` are still validated (with a hint).
 - **Twitter Card validation** — `twitter:card` value validity, title/description/image
-  with correct Open Graph fallbacks.
+  with correct Open Graph fallbacks; accepts tags via `name=` or `property=`.
 - **schema.org / JSON-LD structured data** — valid JSON, `@context`, `@type`, and
   required/recommended properties for common types (`Article`, `NewsArticle`,
   `BlogPosting`, `Product`, `Organization`, `WebSite`, `BreadcrumbList`, `Person`,
@@ -168,26 +170,32 @@ if there are any errors.
 ## Usage
 
 ```text
-Fetch and validate the metadata of a web page
+Fetch and validate a web page's SEO metadata (meta tags, Open Graph, Twitter Cards, schema.org, hreflang).
 
 Usage: metaval [OPTIONS] --url <URL>
 
 Options:
-  -u, --url <URL>              URL to check
-      --render                 Render the page via headless Chrome (execute JS) instead of a plain HTTP GET
-      --chrome-path <PATH>     Path to the Chrome binary (autodetected otherwise)
-      --timeout <TIMEOUT>      Timeout per request in seconds [default: 20]
-      --user-agent <UA>        User agent for HTTP requests (default: metaval/<version>)
-      --check-images           Check reachability of linked images (default: on)
-      --no-check-images        Disable the image reachability check
-      --format <FORMAT>        Output format [default: pretty] [possible values: pretty, json]
-      --fail-on <FAIL_ON>      Severity level at which the exit code becomes non-zero [default: error] [possible values: error, warning]
-      --min-only               Check only the base/minimum set (skip OG/Twitter/schema.org)
-      --insecure               Ignore TLS certificate errors
-      --no-color               Disable colored output (also via NO_COLOR)
-  -v, --verbose...             Increase logging verbosity (repeatable: -vv)
-  -h, --help                   Print help
-  -V, --version                Print version
+  -u, --url <URL>  URL to fetch and validate (http or https)
+  -h, --help       Print help (see more with '--help')
+  -V, --version    Print version
+
+Fetching:
+      --render               Render with headless Chrome (run JavaScript) instead of a plain HTTP GET
+      --chrome-path <PATH>   Path to the Chrome/Chromium binary used by --render (autodetected otherwise)
+      --timeout <SECONDS>    Per-request timeout in seconds [default: 20]
+      --user-agent <STRING>  User-Agent header for all HTTP requests [default: metaval/<version>]
+      --insecure             Accept invalid / self-signed TLS certificates (insecure)
+
+Checks:
+      --check-images     Check that linked images are reachable (this is the default)
+      --no-check-images  Skip the image-reachability checks (faster, fewer network requests)
+      --min-only         Run only the baseline checks; skip Open Graph, Twitter Cards and schema.org
+
+Output:
+      --format <FORMAT>     Output format [default: pretty] [possible values: pretty, json]
+      --fail-on <SEVERITY>  Severity at which the exit code becomes non-zero [default: error] [possible values: error, warning]
+      --no-color            Disable colored output (also honored via the NO_COLOR env var)
+  -v, --verbose...          Increase logging verbosity to stderr (repeatable: -v, -vv, -vvv)
 ```
 
 ### Common examples
@@ -247,7 +255,7 @@ schema.org / JSON-LD
 Fetch
   ✓ fetch.status — HTTP status OK (200)
 
-Summary: 2 errors, 1 warnings, 4 info, 6 OK
+Summary: 2 errors, 1 warning, 4 info, 6 OK
 Final URL: https://example.com/ (status 200)
 ```
 
@@ -266,9 +274,12 @@ programmatically (the IDs never change between releases).
 | --- | --- |
 | `base.title.present` | `<title>` exists and is non-empty |
 | `base.title.length` | Title length within ~10–60 characters |
+| `base.title.unique` | Exactly one `<title>` element (duplicates: search engines pick one themselves) |
 | `base.description.present` | `<meta name="description">` exists |
 | `base.description.length` | Description length within ~50–160 characters |
+| `base.description.unique` | No duplicate meta descriptions (typical theme + SEO-plugin clash) |
 | `base.charset.present` | `<meta charset>` declared |
+| `base.charset.utf8` | Charset is UTF-8 (the recommended encoding) |
 | `base.viewport.present` | `<meta name="viewport">` set |
 | `base.lang.present` | `<html lang>` set |
 | `base.canonical.present` | `<link rel="canonical">` present |
@@ -276,7 +287,7 @@ programmatically (the IDs never change between releases).
 | `base.canonical.matches` | Canonical matches the final URL |
 | `base.canonical.unique` | No conflicting canonical links |
 | `base.robots.indexable` | Page is not `noindex` (meta robots / googlebot / `X-Robots-Tag`) |
-| `base.robots.follow` | Warns on `nofollow` |
+| `base.robots.follow` | Notes `nofollow` (info) |
 | `base.robots.parse` | Robots directives are recognized |
 
 ### Internationalization — hreflang (`hreflang.*`)
@@ -295,6 +306,7 @@ programmatically (the IDs never change between releases).
 
 | Rule | Checks |
 | --- | --- |
+| `og.attribute` | OG tags declared via `property=` (tags via `name=` are still validated, with a hint) |
 | `og.title.present` | `og:title` |
 | `og.type.present` | `og:type` present and a known value |
 | `og.url.present` | `og:url` present and absolute |

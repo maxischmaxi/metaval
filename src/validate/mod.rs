@@ -17,7 +17,7 @@ use crate::model::{Finding, PageMetadata};
 /// Sync-Validatoren liefern Presence/Format; Bild-Erreichbarkeit läuft als
 /// separater async Pass über `image_client`.
 pub async fn run_all(meta: &PageMetadata, args: &Args, image_client: &Client) -> Vec<Finding> {
-    let mut out = baseline::validate(meta); // immer (Minimum-Set, §6.1)
+    let mut out = baseline::validate(meta); // immer (Minimum-Set)
     out.extend(hreflang::validate(meta)); // Internationalisierung gehört zum Basis-Set
 
     if !args.min_only {
@@ -50,9 +50,11 @@ pub(crate) fn normalize_url(u: &Url) -> String {
     }
 }
 
-/// `true`, wenn `s` eine absolute URL ist (relative ⇒ Parse-Fehler).
+/// `true`, wenn `s` eine absolute http(s)-URL ist. Relative Pfade scheitern am
+/// Parse; andere Schemata (`data:`, `javascript:`, `mailto:` …) sind zwar
+/// parsebar, aber für Canonical/OG/hreflang nutzlos und zählen nicht.
 pub(crate) fn is_absolute_url(s: &str) -> bool {
-    Url::parse(s).is_ok()
+    Url::parse(s).map(|u| matches!(u.scheme(), "http" | "https")).unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -71,6 +73,7 @@ pub mod test_support {
             content_type: Some("text/html".to_string()),
             x_robots_tag: None,
             title: None,
+            title_count: 0,
             html_lang: None,
             meta_named: HashMap::new(),
             meta_property: HashMap::new(),
@@ -99,7 +102,11 @@ mod tests {
     #[test]
     fn absolute_detection() {
         assert!(is_absolute_url("https://example.com/x.png"));
+        assert!(is_absolute_url("http://example.com/x.png"));
         assert!(!is_absolute_url("/x.png"));
         assert!(!is_absolute_url("x.png"));
+        // Parsebar, aber kein http(s) — zählt nicht als absolute Web-URL.
+        assert!(!is_absolute_url("data:image/png;base64,AAAA"));
+        assert!(!is_absolute_url("javascript:void(0)"));
     }
 }

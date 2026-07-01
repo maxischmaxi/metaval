@@ -58,8 +58,14 @@ async fn run(args: &Args) -> Result<ExitCode, AppError> {
     let meta = extract::extract(&page);
 
     // Separater Client für Bild-Checks (unabhängig vom Fetch-Modus).
+    let mut image_headers = reqwest::header::HeaderMap::new();
+    image_headers.insert(
+        reqwest::header::ACCEPT,
+        reqwest::header::HeaderValue::from_static("image/*,*/*;q=0.8"),
+    );
     let image_client = reqwest::Client::builder()
         .user_agent(args.effective_user_agent())
+        .default_headers(image_headers)
         .timeout(Duration::from_secs(args.timeout))
         .redirect(redirect::Policy::limited(10))
         .danger_accept_invalid_certs(args.insecure)

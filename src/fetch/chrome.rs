@@ -24,6 +24,8 @@ pub struct ChromeFetcher {
     chrome_path: Option<String>,
     timeout: u64,
     insecure: bool,
+    /// Nur ein explizites `--user-agent`-Override; ohne bleibt Chromes eigener UA.
+    user_agent: Option<String>,
 }
 
 impl ChromeFetcher {
@@ -32,6 +34,7 @@ impl ChromeFetcher {
             chrome_path: args.chrome_path.clone(),
             timeout: args.timeout,
             insecure: args.insecure,
+            user_agent: args.user_agent.clone(),
         }
     }
 
@@ -46,6 +49,9 @@ impl ChromeFetcher {
         }
         if self.insecure {
             builder = builder.arg("--ignore-certificate-errors");
+        }
+        if let Some(ua) = &self.user_agent {
+            builder = builder.arg(format!("--user-agent={ua}"));
         }
 
         // build() liefert Err(String); ein Autodetect-Miss (kein Chrome gefunden) landet hier.

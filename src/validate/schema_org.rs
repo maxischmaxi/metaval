@@ -1,4 +1,4 @@
-//! schema.org / JSON-LD-Validierung (`PLAN.md §6.4`). Regel-IDs `ld.*`.
+//! schema.org / JSON-LD-Validierung. Regel-IDs `ld.*`.
 //! Erweiterbares Typ-Register: ein neuer Typ = eine neue Zeile in `REGISTRY`.
 //! Bild-Erreichbarkeit (`ld.image.reachable`) läuft separat in `images.rs`.
 
@@ -70,7 +70,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     let ld = Category::SchemaOrg;
     let mut f = Vec::new();
 
-    // Kaputte Blöcke (§8: Rest läuft weiter).
+    // Kaputte Blöcke melden; die validen werden trotzdem weiter geprüft.
     for err in &meta.json_ld_errors {
         let snippet: String = err.chars().take(80).collect();
         f.push(

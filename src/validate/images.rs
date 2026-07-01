@@ -1,4 +1,4 @@
-//! Bild-Erreichbarkeit (`PLAN.md §7`). Kandidaten sammeln (synchron, rein),
+//! Bild-Erreichbarkeit. Kandidaten sammeln (synchron, rein),
 //! dann nebenläufig prüfen (max. 8 parallel via `futures::buffer_unordered`).
 //! Findings tragen die Ursprungs-Kategorie/Regel, damit sie im Report dort landen.
 
@@ -45,13 +45,13 @@ pub fn collect_candidates(meta: &PageMetadata, min_only: bool) -> Vec<ImageCandi
     };
 
     if !min_only {
-        for img in PageMetadata::all(&meta.meta_property, "og:image") {
+        for img in meta.og_all("og:image") {
             push(img, Category::OpenGraph, "og.image.reachable", &mut out);
         }
-        for img in PageMetadata::all(&meta.meta_property, "og:image:secure_url") {
+        for img in meta.og_all("og:image:secure_url") {
             push(img, Category::OpenGraph, "og.image.reachable", &mut out);
         }
-        for img in PageMetadata::all(&meta.meta_named, "twitter:image") {
+        for img in meta.twitter_all("twitter:image") {
             push(img, Category::Twitter, "tw.image.reachable", &mut out);
         }
         let mut ld_images = Vec::new();
@@ -108,22 +108,20 @@ pub async fn check_all(candidates: Vec<ImageCandidate>, client: &Client) -> Vec<
 }
 
 async fn check_one(url: &Url, client: &Client) -> Reachability {
-    // 1) HEAD
+    // 1) HEAD — billig, aber viele Server/CDNs beantworten HEAD falsch
+    //    (403/404/405 trotz funktionierendem GET). Deshalb ist *jede*
+    //    Nicht-Erfolgs-Antwort nur ein Grund für den GET-Fallback, kein Urteil.
     if let Ok(r) = client.head(url.clone()).send().await {
         let status = r.status();
-        let ct = content_type(&r);
-        if status.is_success() {
-            if let Some(ct) = ct {
-                return classify(status, Some(ct));
-            }
-            // 2xx ohne Content-Type → ranged GET versuchen.
-        } else if status.as_u16() != 405 && status.as_u16() != 501 {
-            return Reachability::BadStatus(status.as_u16());
+        if status.is_success()
+            && let Some(ct) = content_type(&r)
+        {
+            return classify(status, Some(ct));
         }
-        // 405/501/ohne CT → Fallback.
+        // Nicht-2xx oder 2xx ohne Content-Type → Fallback.
     }
 
-    // 2) Fallback: GET mit Range (nur erstes Byte).
+    // 2) Fallback: GET mit Range (nur erstes Byte). Dessen Antwort zählt.
     match client.get(url.clone()).header(RANGE, "bytes=0-0").send().await {
         Ok(r) => classify(r.status(), content_type(&r)),
         Err(e) => Reachability::NetworkError(e.to_string()),

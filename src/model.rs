@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use serde::Serialize;
 use url::Url;
 
-/// Schweregrad eines Findings. Deklarationsreihenfolge entspricht `PLAN.md §6`.
+/// Schweregrad eines Findings.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
@@ -136,6 +136,8 @@ pub struct PageMetadata {
     /// `X-Robots-Tag`-Response-Header (für die Indexierbarkeits-Prüfung).
     pub x_robots_tag: Option<String>,
     pub title: Option<String>,
+    /// Anzahl der `<title>`-Elemente im `<head>` (für die Eindeutigkeits-Prüfung).
+    pub title_count: usize,
     pub html_lang: Option<String>,
     /// `<meta name=... content=...>` — Mehrfachwerte je Key (lowercased).
     pub meta_named: HashMap<String, Vec<String>>,
@@ -165,24 +167,51 @@ impl PageMetadata {
         map.get(key).map(Vec::as_slice).unwrap_or(&[])
     }
 
-    /// Erster `og:*`-Property-Wert.
+    /// Erster `og:*`-Wert. Spec-konform via `property=`, tolerant auch via
+    /// `name=` (in freier Wildbahn verbreitet; Crawler akzeptieren beides).
     pub fn og(&self, key: &str) -> Option<&str> {
-        Self::first(&self.meta_property, key)
+        Self::first(&self.meta_property, key).or_else(|| Self::first(&self.meta_named, key))
     }
 
-    /// Erster `name=`-Meta-Wert (twitter:*, description, …).
+    /// Alle `og:*`-Werte für `key` (`property=` zuerst, dann `name=`).
+    pub fn og_all(&self, key: &str) -> Vec<&str> {
+        Self::all(&self.meta_property, key)
+            .iter()
+            .chain(Self::all(&self.meta_named, key).iter())
+            .map(String::as_str)
+            .collect()
+    }
+
+    /// Erster `name=`-Meta-Wert (description, robots, …).
     pub fn named(&self, key: &str) -> Option<&str> {
         Self::first(&self.meta_named, key)
     }
 
-    /// `true`, wenn die Seite mindestens ein `og:`-Tag besitzt.
-    pub fn has_open_graph(&self) -> bool {
-        self.meta_property.keys().any(|k| k.starts_with("og:"))
+    /// Erster `twitter:*`-Wert. Spec-konform via `name=`, tolerant auch via
+    /// `property=` (verbreitet, von den Card-Crawlern akzeptiert).
+    pub fn twitter(&self, key: &str) -> Option<&str> {
+        Self::first(&self.meta_named, key).or_else(|| Self::first(&self.meta_property, key))
     }
 
-    /// `true`, wenn die Seite mindestens ein `twitter:`-Tag besitzt.
+    /// Alle `twitter:*`-Werte für `key` (`name=` zuerst, dann `property=`).
+    pub fn twitter_all(&self, key: &str) -> Vec<&str> {
+        Self::all(&self.meta_named, key)
+            .iter()
+            .chain(Self::all(&self.meta_property, key).iter())
+            .map(String::as_str)
+            .collect()
+    }
+
+    /// `true`, wenn die Seite mindestens ein `og:`-Tag besitzt (egal ob via
+    /// `property=` oder `name=`).
+    pub fn has_open_graph(&self) -> bool {
+        self.meta_property.keys().chain(self.meta_named.keys()).any(|k| k.starts_with("og:"))
+    }
+
+    /// `true`, wenn die Seite mindestens ein `twitter:`-Tag besitzt (egal ob
+    /// via `name=` oder `property=`).
     pub fn has_twitter(&self) -> bool {
-        self.meta_named.keys().any(|k| k.starts_with("twitter:"))
+        self.meta_named.keys().chain(self.meta_property.keys()).any(|k| k.starts_with("twitter:"))
     }
 
     /// `<link rel="canonical">`-Href, falls vorhanden.

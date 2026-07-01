@@ -1,4 +1,4 @@
-//! Open-Graph-Validierung (`PLAN.md §6.2`). Regel-IDs `og.*`.
+//! Open-Graph-Validierung. Regel-IDs `og.*`.
 //! Strategie: ≥1 `og:`-Tag ⇒ OG gilt als „gewollt", Pflichtfelder werden Error.
 //! Reachability der Bilder läuft separat in `images.rs`.
 
@@ -23,6 +23,17 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
             "No Open Graph metadata present",
         ));
         return f;
+    }
+
+    // OG-Tags via name= statt property=? Wird von Crawlern meist toleriert
+    // (und hier mitgeprüft), entspricht aber nicht der OG-Spezifikation.
+    if meta.meta_named.keys().any(|k| k.starts_with("og:")) {
+        f.push(Finding::new(
+            og,
+            Severity::Info,
+            "og.attribute",
+            "Open Graph tags declared via name= — the OG spec expects property=",
+        ));
     }
 
     // og:title (Pflicht)
@@ -57,7 +68,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     }
 
     // og:image (Pflicht) + absolut
-    let images = PageMetadata::all(&meta.meta_property, "og:image");
+    let images = meta.og_all("og:image");
     if images.is_empty() {
         f.push(Finding::new(og, Severity::Error, "og.image.present", "og:image missing"));
     } else {
@@ -65,11 +76,11 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
             Finding::new(og, Severity::Pass, "og.image.present", "og:image present")
                 .with_detail(format!("{} image(s)", images.len())),
         );
-        for img in images {
+        for img in &images {
             if !is_absolute_url(img) {
                 f.push(
                     Finding::new(og, Severity::Warning, "og.image.absolute", "og:image is not absolute")
-                        .with_detail(img.clone()),
+                        .with_detail((*img).to_string()),
                 );
             }
         }
@@ -145,6 +156,22 @@ mod tests {
         assert_eq!(rule_sev(&f, "og.type.present"), Some(Severity::Error));
         assert_eq!(rule_sev(&f, "og.url.present"), Some(Severity::Error));
         assert_eq!(rule_sev(&f, "og.image.present"), Some(Severity::Error));
+    }
+
+    #[test]
+    fn og_via_name_attribute_is_recognized_with_hint() {
+        let m = meta_with(|m| {
+            m.meta_named
+                .insert("og:title".to_string(), vec!["T".to_string()]);
+            m.meta_named
+                .insert("og:image".to_string(), vec!["https://example.com/a.png".to_string()]);
+        });
+        let f = validate(&m);
+        // Tags werden trotz name= erkannt und geprüft …
+        assert_eq!(rule_sev(&f, "og.title.present"), Some(Severity::Pass));
+        assert_eq!(rule_sev(&f, "og.image.present"), Some(Severity::Pass));
+        // … aber mit Hinweis auf das falsche Attribut.
+        assert_eq!(rule_sev(&f, "og.attribute"), Some(Severity::Info));
     }
 
     #[test]

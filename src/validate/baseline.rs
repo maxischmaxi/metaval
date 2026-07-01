@@ -1,4 +1,4 @@
-//! Baseline-/Minimum-Validierung (`PLAN.md §6.1`). Stets aktiv. Regel-IDs `base.*`.
+//! Baseline-/Minimum-Validierung. Stets aktiv. Regel-IDs `base.*`.
 
 use std::collections::HashSet;
 
@@ -59,6 +59,16 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
         )),
     }
 
+    // Mehrere <title> im <head>? Suchmaschinen wählen dann selbst eines aus.
+    if meta.title_count > 1 {
+        f.push(Finding::new(
+            b,
+            Severity::Warning,
+            "base.title.unique",
+            format!("{} <title> elements found — keep exactly one", meta.title_count),
+        ));
+    }
+
     // description
     match meta.named("description") {
         Some(desc) => {
@@ -86,12 +96,39 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
         )),
     }
 
+    // Mehrere Descriptions (typisch: Theme + SEO-Plugin injizieren beide eine).
+    let descriptions = PageMetadata::all(&meta.meta_named, "description");
+    if descriptions.len() > 1 {
+        f.push(Finding::new(
+            b,
+            Severity::Warning,
+            "base.description.unique",
+            format!(
+                "{} <meta name=\"description\"> tags found — keep exactly one",
+                descriptions.len()
+            ),
+        ));
+    }
+
     // charset
     match &meta.charset {
-        Some(cs) => f.push(
-            Finding::new(b, Severity::Pass, "base.charset.present", "Character set declared")
-                .with_detail(cs.clone()),
-        ),
+        Some(cs) => {
+            f.push(
+                Finding::new(b, Severity::Pass, "base.charset.present", "Character set declared")
+                    .with_detail(cs.clone()),
+            );
+            if !cs.eq_ignore_ascii_case("utf-8") {
+                f.push(
+                    Finding::new(
+                        b,
+                        Severity::Info,
+                        "base.charset.utf8",
+                        "Charset is not UTF-8 — UTF-8 is the recommended encoding for the web",
+                    )
+                    .with_detail(cs.clone()),
+                );
+            }
+        }
         None => f.push(Finding::new(
             b,
             Severity::Error,
@@ -372,6 +409,33 @@ mod tests {
         });
         let f = validate(&m);
         assert_eq!(rule_sev(&f, "base.robots.indexable"), Some(Severity::Warning));
+    }
+
+    #[test]
+    fn duplicate_titles_and_descriptions_warn() {
+        let m = meta_with(|m| {
+            m.title = Some("Ein völlig normaler Seitentitel".to_string());
+            m.title_count = 2;
+            m.meta_named.insert(
+                "description".to_string(),
+                vec!["Beschreibung eins".to_string(), "Beschreibung zwei".to_string()],
+            );
+        });
+        let f = validate(&m);
+        assert_eq!(rule_sev(&f, "base.title.unique"), Some(Severity::Warning));
+        assert_eq!(rule_sev(&f, "base.description.unique"), Some(Severity::Warning));
+    }
+
+    #[test]
+    fn non_utf8_charset_is_info() {
+        let m = meta_with(|m| m.charset = Some("ISO-8859-1".to_string()));
+        let f = validate(&m);
+        assert_eq!(rule_sev(&f, "base.charset.present"), Some(Severity::Pass));
+        assert_eq!(rule_sev(&f, "base.charset.utf8"), Some(Severity::Info));
+
+        let m = meta_with(|m| m.charset = Some("UTF-8".to_string()));
+        let f = validate(&m);
+        assert_eq!(rule_sev(&f, "base.charset.utf8"), None);
     }
 
     #[test]

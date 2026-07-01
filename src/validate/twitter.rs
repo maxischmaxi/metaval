@@ -1,4 +1,4 @@
-//! Twitter-Card-Validierung (`PLAN.md §6.3`). Regel-IDs `tw.*`.
+//! Twitter-Card-Validierung. Regel-IDs `tw.*`.
 //! Konsistent zu OG: ohne jegliches `twitter:`-Tag nur ein Info, sonst volle Prüfung.
 
 use crate::model::{Category, Finding, PageMetadata, Severity};
@@ -17,7 +17,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     }
 
     // twitter:card
-    let card = meta.named("twitter:card");
+    let card = meta.twitter("twitter:card");
     match card {
         Some(c) => {
             f.push(Finding::new(tw, Severity::Pass, "tw.card.present", "twitter:card present").with_detail(c.to_string()));
@@ -34,7 +34,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     }
 
     // twitter:title (Fallback og:title zulässig)
-    if meta.named("twitter:title").is_some() {
+    if meta.twitter("twitter:title").is_some() {
         f.push(Finding::new(tw, Severity::Pass, "tw.title.present", "twitter:title present"));
     } else if meta.og("og:title").is_some() {
         f.push(Finding::new(tw, Severity::Info, "tw.title.present", "twitter:title missing (og:title fallback present)"));
@@ -43,7 +43,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     }
 
     // twitter:description
-    if meta.named("twitter:description").is_some() {
+    if meta.twitter("twitter:description").is_some() {
         f.push(Finding::new(tw, Severity::Pass, "tw.description.present", "twitter:description present"));
     } else {
         f.push(Finding::new(tw, Severity::Info, "tw.description.present", "twitter:description missing"));
@@ -53,7 +53,7 @@ pub fn validate(meta: &PageMetadata) -> Vec<Finding> {
     let needs_image = card
         .map(|c| IMAGE_CARDS.contains(&c.to_ascii_lowercase().as_str()))
         .unwrap_or(false);
-    let has_image = meta.named("twitter:image").is_some() || meta.og("og:image").is_some();
+    let has_image = meta.twitter("twitter:image").is_some() || meta.og("og:image").is_some();
     if needs_image {
         if has_image {
             f.push(Finding::new(tw, Severity::Pass, "tw.image.present", "twitter:image (or og:image fallback) present"));
@@ -95,6 +95,17 @@ mod tests {
         });
         let f = validate(&m);
         assert_eq!(rule_sev(&f, "tw.card.valid"), Some(Severity::Error));
+    }
+
+    #[test]
+    fn twitter_via_property_attribute_is_recognized() {
+        let m = meta_with(|m| {
+            m.meta_property
+                .insert("twitter:card".to_string(), vec!["summary".to_string()]);
+        });
+        let f = validate(&m);
+        assert_eq!(rule_sev(&f, "tw.card.present"), Some(Severity::Pass));
+        assert_eq!(rule_sev(&f, "tw.card.valid"), Some(Severity::Pass));
     }
 
     #[test]

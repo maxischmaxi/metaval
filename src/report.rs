@@ -74,7 +74,7 @@ fn render_pretty(
     findings: &[Finding],
     out: &mut impl Write,
 ) -> io::Result<()> {
-    writeln!(out, "metaval — {}", page.requested_url)?;
+    writeln!(out, "{} — {}", bold("metaval", color), page.requested_url)?;
 
     // Kategorien in stabiler Reihenfolge gruppieren.
     let mut categories: Vec<Category> = findings.iter().map(|f| f.category).collect();
@@ -85,10 +85,12 @@ fn render_pretty(
         writeln!(out)?;
         writeln!(out, "{}", bold(cat.title(), color))?;
         for f in findings.iter().filter(|f| f.category == cat) {
+            // Farbiges Symbol, gedimmte Regel-ID, Meldung normal, Detail gedimmt —
+            // so bleibt die Meldung der optische Anker jeder Zeile.
             let symbol = colorize(f.severity.symbol(), f.severity, color);
-            write!(out, "  {symbol} {} — {}", f.rule, f.message)?;
+            write!(out, "  {symbol} {} — {}", dim(&f.rule, color), f.message)?;
             if let Some(detail) = &f.detail {
-                write!(out, " ({detail})")?;
+                write!(out, " {}", dim(&format!("({detail})"), color))?;
             }
             writeln!(out)?;
         }
@@ -98,11 +100,43 @@ fn render_pretty(
     writeln!(out)?;
     writeln!(
         out,
-        "Summary: {} errors, {} warnings, {} info, {} OK",
-        s.errors, s.warnings, s.info, s.pass
+        "{} {}, {}, {}, {}",
+        bold("Summary:", color),
+        severity_count(s.errors, "error", "errors", Severity::Error, color),
+        severity_count(s.warnings, "warning", "warnings", Severity::Warning, color),
+        severity_count(s.info, "info", "info", Severity::Info, color),
+        severity_count(s.pass, "OK", "OK", Severity::Pass, color),
     )?;
-    writeln!(out, "Final URL: {} (status {})", page.final_url, page.status)?;
+    writeln!(
+        out,
+        "{} {} {}{}{}",
+        dim("Final URL:", color),
+        page.final_url,
+        dim("(status ", color),
+        status_colored(page.status, color),
+        dim(")", color),
+    )?;
     Ok(())
+}
+
+/// Zähler wie "2 errors": in Severity-Farbe, wenn > 0, sonst gedimmt;
+/// Singular/Plural korrekt.
+fn severity_count(n: usize, singular: &str, plural: &str, sev: Severity, color: bool) -> String {
+    let text = format!("{n} {}", if n == 1 { singular } else { plural });
+    if n == 0 { dim(&text, color) } else { colorize(&text, sev, color) }
+}
+
+/// HTTP-Status nach Klasse eingefärbt: 2xx grün, 3xx gelb, Rest rot.
+fn status_colored(status: u16, enabled: bool) -> String {
+    if !enabled {
+        return status.to_string();
+    }
+    use owo_colors::OwoColorize;
+    match status {
+        200..=299 => status.green().to_string(),
+        300..=399 => status.yellow().to_string(),
+        _ => status.red().to_string(),
+    }
 }
 
 fn colorize(text: &str, sev: Severity, enabled: bool) -> String {
@@ -124,6 +158,14 @@ fn bold(text: &str, enabled: bool) -> String {
     }
     use owo_colors::OwoColorize;
     text.bold().to_string()
+}
+
+fn dim(text: &str, enabled: bool) -> String {
+    if !enabled {
+        return text.to_string();
+    }
+    use owo_colors::OwoColorize;
+    text.dimmed().to_string()
 }
 
 #[cfg(test)]
@@ -148,6 +190,13 @@ mod tests {
         assert_eq!(s.warnings, 2);
         assert_eq!(s.pass, 1);
         assert_eq!(s.info, 0);
+    }
+
+    #[test]
+    fn severity_count_pluralizes() {
+        assert_eq!(severity_count(0, "error", "errors", Severity::Error, false), "0 errors");
+        assert_eq!(severity_count(1, "warning", "warnings", Severity::Warning, false), "1 warning");
+        assert_eq!(severity_count(2, "error", "errors", Severity::Error, false), "2 errors");
     }
 
     #[test]

@@ -17,6 +17,7 @@ macro_rules! sel {
 }
 
 sel!(SEL_TITLE, "title");
+sel!(SEL_HEAD_TITLE, "head > title");
 sel!(SEL_HTML, "html");
 sel!(SEL_META_NAME, "meta[name]");
 sel!(SEL_META_PROPERTY, "meta[property]");
@@ -30,9 +31,21 @@ sel!(SEL_BODY, "body");
 pub fn extract(page: &FetchedPage) -> PageMetadata {
     let doc = Html::parse_document(&page.html);
 
-    let title = doc
-        .select(&SEL_TITLE)
-        .next()
+    // Titel bevorzugt aus dem <head> — der nackte "title"-Selektor würde auch
+    // <svg><title> treffen. Fallback für kaputte Dokumente ohne Head-Titel,
+    // dabei SVG-Beschriftungen (title mit svg-Vorfahr) überspringen.
+    let head_titles: Vec<_> = doc.select(&SEL_HEAD_TITLE).collect();
+    let title_count = head_titles.len();
+    let title = head_titles
+        .first()
+        .copied()
+        .or_else(|| {
+            doc.select(&SEL_TITLE).find(|e| {
+                !e.ancestors()
+                    .filter_map(scraper::ElementRef::wrap)
+                    .any(|a| a.value().name().eq_ignore_ascii_case("svg"))
+            })
+        })
         .map(|e| e.text().collect::<String>().trim().to_string());
 
     let html_lang = doc
@@ -74,7 +87,9 @@ pub fn extract(page: &FetchedPage) -> PageMetadata {
     let mut json_ld = Vec::new();
     let mut json_ld_errors = Vec::new();
     for el in doc.select(&SEL_JSONLD) {
-        let raw = el.inner_html();
+        // .text() statt inner_html(): der rohe Skript-Text, ohne dass der
+        // Serializer Zeichen wie & oder < HTML-escaped und das JSON zerbricht.
+        let raw = el.text().collect::<String>();
         if raw.trim().is_empty() {
             continue;
         }
@@ -102,6 +117,7 @@ pub fn extract(page: &FetchedPage) -> PageMetadata {
         content_type: page.content_type.clone(),
         x_robots_tag: page.x_robots_tag.clone(),
         title,
+        title_count,
         html_lang,
         meta_named,
         meta_property,
@@ -232,5 +248,34 @@ mod tests {
         let html = r#"<html><head></head><body><div id="root"></div></body></html>"#;
         let m = extract(&page(html));
         assert!(m.looks_like_spa);
+    }
+
+    #[test]
+    fn counts_duplicate_head_titles() {
+        let html = r#"<html><head><title>Erster</title><title>Zweiter</title></head>
+            <body>text</body></html>"#;
+        let m = extract(&page(html));
+        assert_eq!(m.title.as_deref(), Some("Erster"));
+        assert_eq!(m.title_count, 2);
+    }
+
+    #[test]
+    fn svg_title_is_not_the_page_title() {
+        let html = r#"<html><head><meta charset="utf-8"></head>
+            <body><svg><title>Icon-Beschriftung</title></svg>Genug Text im Body dieser Seite.</body></html>"#;
+        let m = extract(&page(html));
+        assert_eq!(m.title_count, 0);
+        assert_eq!(m.title, None);
+    }
+
+    #[test]
+    fn json_ld_with_ampersand_survives() {
+        let html = r#"<html><head><title>x</title>
+            <script type="application/ld+json">{"@type":"Organization","name":"A & B GmbH","url":"https://example.com/?a=1&b=2"}</script>
+            </head><body>text</body></html>"#;
+        let m = extract(&page(html));
+        assert_eq!(m.json_ld.len(), 1);
+        assert_eq!(m.json_ld_errors.len(), 0);
+        assert_eq!(m.json_ld[0]["name"], "A & B GmbH");
     }
 }

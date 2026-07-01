@@ -1,4 +1,4 @@
-//! CLI-Definitionen (clap derive). Flags exakt nach `PLAN.md §2`.
+//! CLI-Definitionen (clap derive).
 
 use clap::{ArgAction, Parser, ValueEnum};
 
@@ -81,7 +81,13 @@ pub struct Args {
     /// Applies to the page fetch and to each individual image-reachability
     /// request, not to the run as a whole. Raise it for slow origins; lower it
     /// to fail fast in CI.
-    #[arg(long, default_value_t = 20, value_name = "SECONDS", help_heading = "Fetching")]
+    #[arg(
+        long,
+        default_value_t = 20,
+        value_name = "SECONDS",
+        value_parser = clap::value_parser!(u64).range(1..),
+        help_heading = "Fetching"
+    )]
     pub timeout: u64,
 
     /// User-Agent header for all HTTP requests [default: metaval/<version>].
@@ -89,7 +95,7 @@ pub struct Args {
     /// Some sites block unknown agents with 401/403/429 (you'll see a
     /// fetch.bot_block hint). Set a browser-like value to get through, e.g.
     /// --user-agent "Mozilla/5.0 (compatible; metaval)". Also used for the
-    /// image-reachability requests.
+    /// image-reachability requests, and passed to Chrome with --render.
     #[arg(long, value_name = "STRING", help_heading = "Fetching")]
     pub user_agent: Option<String>,
 
@@ -189,16 +195,23 @@ impl Args {
             .unwrap_or_else(|| format!("metaval/{}", env!("CARGO_PKG_VERSION")))
     }
 
-    /// Farbe aktiv? `--no-color` und die `NO_COLOR`-Env deaktivieren sie.
-    pub fn color_enabled(&self) -> bool {
+    /// Farbe per Flag/Env erlaubt? (`--no-color` und `NO_COLOR` deaktivieren.)
+    fn color_allowed_by_flags(&self) -> bool {
         !self.no_color && std::env::var_os("NO_COLOR").is_none()
     }
 
+    /// Farbe für den Report aktiv? Zusätzlich zu Flag/Env muss stdout ein
+    /// Terminal sein — Pipes und Dateien bekommen nie ANSI-Codes.
+    pub fn color_enabled(&self) -> bool {
+        use std::io::IsTerminal;
+        self.color_allowed_by_flags() && std::io::stdout().is_terminal()
+    }
+
     /// Lade-Animation erlaubt? Aus bei `--no-color`/`NO_COLOR` und bei `-v`
-    /// (dann würden Log-Zeilen mit dem Spinner kollidieren). Die zusätzliche
-    /// TTY-Prüfung passiert im Spinner selbst.
+    /// (dann würden Log-Zeilen mit dem Spinner kollidieren). Der Spinner läuft
+    /// auf stderr und prüft dessen TTY selbst — stdout darf gepiped sein.
     pub fn progress_enabled(&self) -> bool {
-        self.color_enabled() && self.verbose == 0
+        self.color_allowed_by_flags() && self.verbose == 0
     }
 }
 
